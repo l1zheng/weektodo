@@ -267,6 +267,7 @@ export default {
     }
 
     this.resetAppOnDayChange();
+    this.startPeriodicDateCheck();
   },
   methods: {
     weekMoveLeft: function () {
@@ -447,6 +448,20 @@ export default {
         return this.$t("notifications.pendingTasksYesterdayAndToday", [yesterayPendingTasksCount, todayPendingTasksCount]);
       }
     },
+    checkAndSyncIfDateChanged: function () {
+      // Check if the date has changed since last open
+      const currentDate = moment().format("YYYYMMDD");
+      const lastDayOpened = this.$store.getters.config.lastDayOpened;
+
+      // If date has changed and moveOldTasks is enabled, sync tasks
+      if (currentDate !== lastDayOpened && this.$store.getters.config.moveOldTasks) {
+        this.moveOldTasksToToday().then(() => {
+          this.refreshTodayNotifications();
+          this.$store.commit("updateConfig", { val: currentDate, key: "lastDayOpened" });
+          configRepository.update(this.$store.getters.config);
+        });
+      }
+    },
     resetAppOnDayChange: function () {
       var x = new moment();
       var y = new moment().add(1, "d").startOf("date");
@@ -454,13 +469,29 @@ export default {
 
       setTimeout(
         function () {
+          // At midnight, check and sync if date changed (works for both visible and hidden windows)
+          this.checkAndSyncIfDateChanged();
+          this.refreshTodayNotifications();
+
+          // If window is hidden in Electron, reload the app
           if (isElectron() && !this.ipcRenderer.sendSync("is-windows-visible")) {
             window.location.reload();
           }
-          this.refreshTodayNotifications();
+
+          // Set up the next midnight timer
           this.resetAppOnDayChange();
         }.bind(this),
         duration
+      );
+    },
+    startPeriodicDateCheck: function () {
+      // Check every hour (3600000ms) if date has changed
+      // This is a safety net for edge cases (e.g., app was closed and reopened during the day)
+      setInterval(
+        function () {
+          this.checkAndSyncIfDateChanged();
+        }.bind(this),
+        3600000 // 1 hour in milliseconds
       );
     },
     moveOldTasksToToday: async function () {

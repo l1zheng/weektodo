@@ -37,16 +37,13 @@
                         break;
                 }
             },
-            emailLink: function (link) {
-                window.open(link);
+            emailLink: function () {
+                // Network access disabled.
+                return;
             },
-            externaLink: function (link) {
-                let isElectron = require("is-electron");
-                if (isElectron()) {
-                    require('electron').shell.openExternal(link, '_blank');
-                } else {
-                    window.open(link, '_blank');
-                }
+            externaLink: function () {
+                // Network access disabled.
+                return;
             },
             tagIdLink: function (id) {
                 document.getElementById(id).click();

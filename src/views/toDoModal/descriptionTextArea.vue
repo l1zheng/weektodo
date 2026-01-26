@@ -57,7 +57,8 @@ export default {
             return this.md.render(this.desc);
         },
         goToMarkDown: function () {
-            window.open("https://commonmark.org/help/", "_blank");
+            // Network access disabled.
+            return;
         },
     },
     watch: {

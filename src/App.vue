@@ -245,11 +245,7 @@ export default {
     this.$refs.weekListContainer.scrollLeft = this.todoListWidth();
     this.calendarHeight = this.$store.getters.config.calendarHeight;
     window.addEventListener("resize", this.weekResetScroll);
-    document.onreadystatechange = () => {
-      if (document.readyState == "complete") {
-        setTimeout(this.hideSplash, 4500);
-      }
-    };
+    // Splash screen hides when initial data load completes.
 
     if (isElectron()) {
       const { ipcRenderer } = require("electron");
@@ -331,11 +327,7 @@ export default {
       return isElectron();
     },
     hideSplash: function () {
-      if (this.isElectron()) {
-        if (this.ipcRenderer.sendSync("is-windows-visible")) {
-          this.$refs.splash.hideSplash();
-        }
-      } else {
+      if (this.$refs.splash) {
         this.$refs.splash.hideSplash();
       }
       this.checksOnLoadApp();
@@ -400,12 +392,14 @@ export default {
               this.$store.commit("updateConfig", { val: moment().format("YYYYMMDD"), key: "lastDayOpened" });
               configRepository.update(this.$store.getters.config);
               if (isElectron()) this.showInitialNotification();
+              this.hideSplash();
             });
           } else {
             this.refreshTodayNotifications();
             if (isElectron()) this.showInitialNotification();
             this.$store.commit("updateConfig", { val: moment().format("YYYYMMDD"), key: "lastDayOpened" });
             configRepository.update(this.$store.getters.config);
+            this.hideSplash();
           }
         }
       }
@@ -539,13 +533,8 @@ export default {
       }
     },
     checkForUpdates: function () {
-      if (this.isElectron() && this.$store.getters.config.checkUpdates) {
-        const axios = require("axios").default;
-        axios
-          .get("https://app.weektodo.me/version.json")
-          .then((response) => this.showNewVersionToast(response))
-          .catch((error) => console.log(error.message));
-      }
+      // Network access disabled: skip remote update checks.
+      return;
     },
     checksOnLoadApp: function () {
       if (this.isElectron()) {
@@ -564,15 +553,12 @@ export default {
       }
     },
     downloadNewVersion: function () {
-      let isElectron = require("is-electron");
-      if (isElectron()) {
-        require("electron").shell.openExternal("https://weektodo.me", "_blank");
-      } else {
-        window.open("https://weektodo.me", "_blank");
-      }
+      // Network access disabled.
+      return;
     },
     seeChangeLog: function () {
-      window.open("https://weektodo.me/changelog", "_blank");
+      // Network access disabled.
+      return;
     },
     syncElectronConfig: function () {
       const { ipcRenderer } = require("electron");

@@ -146,7 +146,8 @@ export default {
       document.getElementById("config-general-tab").click();
     },
     openDonateModal: function () {
-      window.open("https://weektodo.me/support-us", "_blank");
+      // Network access disabled.
+      return;
     },
     print: function () {
       window.print();

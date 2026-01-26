@@ -1,6 +1,6 @@
 "use strict";
 
-import { app, protocol, BrowserWindow, Menu, Tray, ipcMain, nativeImage } from "electron";
+import { app, protocol, BrowserWindow, Menu, Tray, ipcMain, nativeImage, session } from "electron";
 import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 
@@ -39,10 +39,14 @@ async function createWindow() {
   mainWindow = new BrowserWindow(opts);
   mainWindow.removeMenu();
 
-   mainWindow.webContents.setWindowOpenHandler((details) => {
-    require("electron").shell.openExternal(details.url);
-    return { action: 'deny' }
-  })
+  mainWindow.webContents.setWindowOpenHandler(() => {
+    return { action: "deny" };
+  });
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (/^(https?|wss?):/i.test(url)) {
+      event.preventDefault();
+    }
+  });
 
   ipcMain.on("show-current-window", showCurrentWindow);
   ipcMain.on("is-windows-visible", isWindowsVisible);
@@ -72,9 +76,7 @@ async function createWindow() {
     return false;
   });
 
-  mainWindow.on("restore", function () {
-    setTimeout(hideSplashScreen, 4500);
-  });
+  mainWindow.on("restore", function () {});
 
   if (process.env.WEBPACK_DEV_SERVER_URL) {
     // Load the url of the dev server if in development mode
@@ -100,7 +102,6 @@ if (!gotTheLock) {
     } else {
       createWindow();
     }
-    setTimeout(hideSplashScreen, 5000);
   });
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") {
@@ -117,6 +118,12 @@ if (!gotTheLock) {
   });
 
   app.on("ready", async () => {
+    session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+      if (/^(https?|wss?):/i.test(details.url)) {
+        return callback({ cancel: true });
+      }
+      return callback({ cancel: false });
+    });
     createTray();
     createWindow();
 
@@ -263,7 +270,6 @@ function createTray() {
       click() {
         if (config.get("isMaximized")) mainWindow.maximize();
         showWindow(mainWindow);
-        setTimeout(hideSplashScreen, 5000);
       },
     },
     {

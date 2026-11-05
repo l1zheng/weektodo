@@ -72,14 +72,6 @@
                     @change="changeConfig('customList', configData.customList)" />
                 </div>
 
-                <div v-if="isElectron()" class="form-check form-switch d-flex px-1 mb-3 justify-content-between">
-                  <label class="form-check-label" for="updatesCheckSetting">{{
-                    $t("settings.checkUpdates")
-                  }}</label>
-                  <input class="form-check-input" type="checkbox" id="updatesCheckSetting"
-                    v-model="configData.checkUpdates" @change="changeConfig('checkUpdates', configData.checkUpdates)" />
-                </div>
-
                 <div v-if="isElectron()" class=" form-check form-switch d-flex px-1 mb-3 justify-content-between">
                   <label class="form-check-label" for="openOnStartup">{{
                     $t("settings.openOnStartup")

@@ -135,13 +135,6 @@
         @subTextClick="seeChangeLog"
       ></toast-message>
 
-      <toast-message
-        id="newVersionAvailable"
-        :text="$t('ui.newVersionAvailable')"
-        :sub-text="$t('ui.download')"
-        @subTextClick="downloadNewVersion"
-      ></toast-message>
-
       <toast-message id="copiedAddress" :text="$t('donate.copiedAddres')"></toast-message>
     </div>
   </div>
@@ -212,6 +205,7 @@ export default {
       initialLoadCompleted: false,
       initialListToLoad: 0,
       initialListLoaded: 0,
+      dayChangeInProgress: false,
     };
   },
   beforeCreate() {
@@ -266,7 +260,7 @@ export default {
       }
     }
 
-    this.resetAppOnDayChange();
+    this.startDayChangeWatcher();
   },
   methods: {
     weekMoveLeft: function () {
@@ -447,21 +441,42 @@ export default {
         return this.$t("notifications.pendingTasksYesterdayAndToday", [yesterayPendingTasksCount, todayPendingTasksCount]);
       }
     },
-    resetAppOnDayChange: function () {
-      var x = new moment();
-      var y = new moment().add(1, "d").startOf("date");
-      var duration = moment.duration(y.diff(x)).asMilliseconds();
+    // 不依赖单个长定时器（窗口可见时不触发、系统休眠会推迟），
+    // 而是周期性 + 窗口获得焦点/重新可见时检查日期是否已变化。
+    startDayChangeWatcher: function () {
+      setInterval(this.checkDayChange, 60 * 1000);
+      window.addEventListener("focus", this.checkDayChange);
+      document.addEventListener("visibilitychange", this.checkDayChange);
+    },
+    checkDayChange: function () {
+      if (!this.initialLoadCompleted || this.dayChangeInProgress) return;
+      let today = moment().format("YYYYMMDD");
+      let lastDay = moment(this.$store.getters.config.lastDayOpened).format("YYYYMMDD");
+      if (lastDay >= today) return;
+      // 任务弹窗和行内编辑按列表下标定位任务，移动任务会打乱下标，等编辑结束后再处理
+      if (this.isUserEditing()) return;
 
-      setTimeout(
-        function () {
-          if (isElectron() && !this.ipcRenderer.sendSync("is-windows-visible")) {
-            window.location.reload();
-          }
+      this.dayChangeInProgress = true;
+      let todayLoaded = this.$store.getters.todoLists[today]
+        ? Promise.resolve()
+        : this.$store.dispatch("loadTodoLists", today);
+      todayLoaded
+        .then(() => (this.$store.getters.config.moveOldTasks ? this.moveOldTasksToToday() : null))
+        .then(() => {
+          this.$store.commit("updateConfig", { val: today, key: "lastDayOpened" });
+          configRepository.update(this.$store.getters.config);
+          this.selected_date = today;
+          this.$nextTick(this.weekResetScroll);
           this.refreshTodayNotifications();
-          this.resetAppOnDayChange();
-        }.bind(this),
-        duration
-      );
+        })
+        .finally(() => {
+          this.dayChangeInProgress = false;
+        });
+    },
+    isUserEditing: function () {
+      if (document.querySelector(".modal.show")) return true;
+      let active = document.activeElement;
+      return !!active && active.classList.contains("edit");
     },
     moveOldTasksToToday: async function () {
       var promise = new Promise((resolve) => {
@@ -507,37 +522,13 @@ export default {
         toast.show();
       }
     },
-    checkForUpdates: function () {
-      if (this.isElectron() && this.$store.getters.config.checkUpdates) {
-        const axios = require("axios").default;
-        axios
-          .get("https://app.weektodo.me/version.json")
-          .then((response) => this.showNewVersionToast(response))
-          .catch((error) => console.log(error.message));
-      }
-    },
     checksOnLoadApp: function () {
       if (this.isElectron()) {
         require("electron").ipcRenderer.on("initial-checks", () => {
           this.checkVersion();
-          this.checkForUpdates();
         });
       } else {
         this.checkVersion();
-      }
-    },
-    showNewVersionToast: function (response) {
-      if (response.data.version != version_json.version) {
-        var toast = new Toast(document.getElementById("newVersionAvailable"));
-        toast.show();
-      }
-    },
-    downloadNewVersion: function () {
-      let isElectron = require("is-electron");
-      if (isElectron()) {
-        require("electron").shell.openExternal("https://weektodo.me", "_blank");
-      } else {
-        window.open("https://weektodo.me", "_blank");
       }
     },
     seeChangeLog: function () {
